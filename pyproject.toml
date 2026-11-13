@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mol2chemfig-helper"
+version = "0.1.0"
+description = "Add named mol2chemfig structures to a LaTeX structures.tex file"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+m2c-structure = "mol2chemfig_helper.cli:main"
+
+[tool.setuptools]
+packages = ["mol2chemfig_helper"]
