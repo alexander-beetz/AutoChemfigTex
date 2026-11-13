@@ -26,8 +26,9 @@ from .texfile import (
 from .validation import (
     ValidationError,
     normalize_name,
+    validate_annotation,
+    validate_cmpd_key,
     validate_identifier,
-    validate_label,
     validate_m2c_arg,
 )
 
@@ -37,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="m2c-structure",
         description=(
             "Convert a chemical structure with mol2chemfig and add it to "
-            "structures.tex as a named LaTeX macro."
+            "structures.tex as a named structure macro with a compound label."
         ),
     )
     parser.add_argument(
@@ -72,12 +73,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--label",
-        help="display label stored in \\NameName (default: the macro name)",
+        help="compound label key passed to \\cmpd{...} (default: the macro name)",
     )
     parser.add_argument(
-        "--no-name-macro",
+        "--formula",
+        "--sum-formula",
+        dest="formula",
+        help="sum formula shown below the compound label (inserted as LaTeX)",
+    )
+    parser.add_argument(
+        "--mw",
+        "--molecular-weight",
+        dest="mw",
+        help=(
+            "molecular weight shown below the sum formula or compound label "
+            "(inserted as LaTeX)"
+        ),
+    )
+    parser.add_argument(
+        "--structure-only",
         action="store_true",
-        help="do not generate the auxiliary \\NameName display-label macro",
+        help=(
+            "generate \\Name as the bare structure; by default \\Name includes "
+            "the compound label"
+        ),
     )
     parser.add_argument(
         "--mol2chemfig",
@@ -192,8 +211,18 @@ def _resolve_file(directory: Path, filename: str) -> Path:
 def _run(args: argparse.Namespace) -> int:
     name = normalize_name(args.name)
     label_is_explicit = args.label is not None
-    label = validate_label(args.label if label_is_explicit else name)
+    label = validate_cmpd_key(args.label if label_is_explicit else name)
     identifier = validate_identifier(args.identifier)
+    formula = (
+        validate_annotation(args.formula, "sum formula")
+        if args.formula is not None
+        else None
+    )
+    mw = (
+        validate_annotation(args.mw, "molecular weight")
+        if args.mw is not None
+        else None
+    )
 
     if args.timeout <= 0:
         raise ValidationError("--timeout must be greater than zero")
@@ -221,7 +250,9 @@ def _run(args: argparse.Namespace) -> int:
         label=label,
         chemfig=conversion.chemfig,
         m2c_args=("-f", "-w", *extra_args),
-        generate_name_macro=not args.no_name_macro,
+        structure_only=args.structure_only,
+        formula=formula,
+        mw=mw,
     )
 
     text = document.text
@@ -255,8 +286,7 @@ def _run(args: argparse.Namespace) -> int:
             conflict.managed is not None
             and conflict.managed.text == rendered
             and not conflict.manual
-            and conflict.aux_managed is None
-            and not conflict.aux_manual
+            and not conflict.has_auxiliary_conflict
         ):
             print(f"\\{entry.name} is already up to date in {path}")
             return 0
@@ -324,21 +354,22 @@ def _describe_conflict(text: str, conflict: Conflict, path: Path) -> None:
             f"{line_number(text, definition.start)}.",
             file=sys.stderr,
         )
-    if conflict.aux_managed is not None:
-        print(
-            f"the label macro \\{conflict.name}Name has its own managed block.",
-            file=sys.stderr,
-        )
-    for definition in conflict.aux_manual:
-        print(
-            f"the label macro \\{conflict.name}Name has a manual definition "
-            f"at line {line_number(text, definition.start)}.",
-            file=sys.stderr,
-        )
+    for auxiliary in conflict.auxiliary:
+        if auxiliary.managed is not None:
+            print(
+                f"the auxiliary macro \\{auxiliary.name} has its own managed block.",
+                file=sys.stderr,
+            )
+        for definition in auxiliary.manual:
+            print(
+                f"the auxiliary macro \\{auxiliary.name} has a manual definition "
+                f"at line {line_number(text, definition.start)}.",
+                file=sys.stderr,
+            )
     for block_name in conflict.blocked_by:
         print(
-            f"the managed block for \\{block_name} already defines "
-            f"\\{conflict.name} or its label macro.",
+            f"the managed block for \\{block_name} already defines a macro that "
+            f"would clash with \\{conflict.name}.",
             file=sys.stderr,
         )
 

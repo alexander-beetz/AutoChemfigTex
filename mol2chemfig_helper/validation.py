@@ -112,51 +112,77 @@ def normalize_name(raw: str) -> str:
     return name
 
 
-def validate_label(raw: str) -> str:
-    """Validate a display label used inside ``\\newcommand``.
+_CMPD_KEY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
-    TeX markup is allowed, but newlines, unescaped percent signs and unescaped
-    parameter characters are rejected because they would break the generated
-    macro definition.
+
+def validate_cmpd_key(raw: str) -> str:
+    """Validate the key passed to ``\\cmpd{...}``.
+
+    The key is not typeset directly; it identifies the compound number.  Keep
+    it to characters that are safe inside a TeX argument and useful in labels.
     """
 
     if not isinstance(raw, str):
-        raise ValidationError("label must be text")
+        raise ValidationError("compound label must be text")
+
+    key = raw.strip()
+    if not key:
+        raise ValidationError("compound label must not be empty")
+
+    if not _CMPD_KEY_RE.fullmatch(key):
+        raise ValidationError(
+            "compound label must contain only ASCII letters, digits, '.', '_', "
+            "':' or '-', and must not start with punctuation"
+        )
+
+    return key
+
+
+def validate_annotation(raw: str, field: str) -> str:
+    """Validate one-line TeX text such as a sum formula or molecular weight.
+
+    TeX markup is allowed, but newlines, unescaped percent signs, unescaped
+    parameter characters and unbalanced braces are rejected because they would
+    break the generated ``\\AzidName`` definition.
+    """
+
+    if not isinstance(raw, str):
+        raise ValidationError(f"{field} must be text")
 
     if "\n" in raw or "\r" in raw or "\x00" in raw:
-        raise ValidationError("label must be a single line without NUL bytes")
+        raise ValidationError(f"{field} must be a single line without NUL bytes")
 
     if any(ord(char) < 32 and char != "\t" for char in raw):
-        raise ValidationError("label must not contain control characters")
+        raise ValidationError(f"{field} must not contain control characters")
 
-    label = raw.strip()
-    if not label:
-        raise ValidationError("label must not be empty")
+    value = raw.strip()
+    if not value:
+        raise ValidationError(f"{field} must not be empty")
 
     for character, explanation in {
         "%": "a comment character",
         "#": "a macro parameter character",
     }.items():
         if any(
-            char == character and not _is_escaped(label, index)
-            for index, char in enumerate(label)
+            char == character and not _is_escaped(value, index)
+            for index, char in enumerate(value)
         ):
             raise ValidationError(
-                f"label contains an unescaped '{character}' ({explanation}); "
+                f"{field} contains an unescaped '{character}' ({explanation}); "
                 f"write '\\{character}' if you need the literal character"
             )
 
-    trailing_backslashes = len(label) - len(label.rstrip("\\"))
+    trailing_backslashes = len(value) - len(value.rstrip("\\"))
     if trailing_backslashes % 2:
         raise ValidationError(
-            "label must not end with an unescaped backslash because it would "
+            f"{field} must not end with an unescaped backslash because it would "
             "escape the closing brace of the generated macro"
         )
 
     depth = 0
     cursor = 0
-    while cursor < len(label):
-        char = label[cursor]
+    while cursor < len(value):
+        char = value[cursor]
         if char == "\\":
             cursor += 2
             continue
@@ -165,13 +191,13 @@ def validate_label(raw: str) -> str:
         elif char == "}":
             depth -= 1
             if depth < 0:
-                raise ValidationError("label has an unbalanced closing brace")
+                raise ValidationError(f"{field} has an unbalanced closing brace")
         cursor += 1
 
     if depth:
-        raise ValidationError("label has an unbalanced opening brace")
+        raise ValidationError(f"{field} has an unbalanced opening brace")
 
-    return label
+    return value
 
 
 def validate_identifier(raw: str) -> str:

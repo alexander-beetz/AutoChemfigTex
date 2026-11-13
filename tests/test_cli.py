@@ -52,9 +52,13 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0, stderr)
         text = self.structures.read_text(encoding="utf-8")
         self.assertIn("% === mol2chemfig-helper:Ethanol:BEGIN ===", text)
-        self.assertIn("\\DeclareRobustCommand{\\Ethanol}{%", text)
+        self.assertIn("% style: named", text)
+        self.assertIn("\\newcommand{\\EthanolName}{%", text)
+        self.assertIn("  \\textbf{\\cmpd{Ethanol}}%", text)
+        self.assertIn("\\DeclareRobustCommand{\\EthanolStructure}{%", text)
         self.assertIn("  \\chemfig{CCO}%", text)
-        self.assertIn("\\newcommand{\\EthanolName}{Ethanol}", text)
+        self.assertIn("\\DeclareRobustCommand{\\Ethanol}{%", text)
+        self.assertIn("  \\chemname{\\EthanolStructure}{\\EthanolName}%", text)
         self.assertIn("+\\DeclareRobustCommand", stdout)
         self.assertIn("added \\Ethanol", stdout)
 
@@ -158,6 +162,7 @@ class CliTests(unittest.TestCase):
         text = self.structures.read_text(encoding="utf-8")
         self.assertIn("% === mol2chemfig-helper:Ethanol:BEGIN ===", text)
         self.assertIn("% === mol2chemfig-helper:EthanolTwo:BEGIN ===", text)
+        self.assertIn("\\textbf{\\cmpd{EthanolTwo}}", text)
 
     def test_interactive_abort_leaves_file_unchanged(self) -> None:
         self.assertEqual(self.run_cli(*self.base_args("CCO", "Ethanol"))[0], 0)
@@ -188,22 +193,59 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("+\\DeclareRobustCommand", stdout)
         self.assertIn("added \\Ethanol", stdout)
 
-    def test_custom_label_and_no_name_macro(self) -> None:
+    def test_custom_compound_label_key(self) -> None:
         code, _, stderr = self.run_cli(
             *self.base_args("CCO", "Ethanol"),
             "--label",
-            r"ethyl \textit{alcohol}",
+            "ethyl-alcohol",
         )
         self.assertEqual(code, 0, stderr)
         text = self.structures.read_text(encoding="utf-8")
-        self.assertIn(r"\newcommand{\EthanolName}{ethyl \textit{alcohol}}", text)
+        self.assertIn(r"\textbf{\cmpd{ethyl-alcohol}}", text)
 
+    def test_structure_only_output(self) -> None:
         code, _, stderr = self.run_cli(
-            *self.base_args("CCN", "Ethylamine"), "--no-name-macro"
+            *self.base_args("CCN", "Ethylamine"), "--structure-only"
         )
         self.assertEqual(code, 0, stderr)
         text = self.structures.read_text(encoding="utf-8")
-        self.assertNotIn("EthylamineName", text)
+        self.assertIn("% style: structure-only", text)
+        self.assertIn("\\DeclareRobustCommand{\\Ethylamine}{%", text)
+        self.assertNotIn("EthylamineStructure", text)
+        self.assertIn("\\newcommand{\\EthylamineName}{%", text)
+        self.assertIn("\\textbf{\\cmpd{Ethylamine}}", text)
+
+    def test_formula_and_molecular_weight_are_in_name_macro(self) -> None:
+        code, _, stderr = self.run_cli(
+            *self.base_args("CCO", "Ethanol"),
+            "--formula",
+            "C6H6",
+            "--mw",
+            "78.11",
+        )
+        self.assertEqual(code, 0, stderr)
+        text = self.structures.read_text(encoding="utf-8")
+        self.assertIn("% sum formula: C6H6", text)
+        self.assertIn("% molecular weight: 78.11", text)
+        self.assertIn("  \\shortstack[c]{%", text)
+        self.assertIn("    \\textbf{\\cmpd{Ethanol}}\\\\", text)
+        self.assertIn("    C6H6\\\\", text)
+        self.assertIn("    78.11%", text)
+
+    def test_invalid_formula_is_rejected(self) -> None:
+        code, _, stderr = self.run_cli(
+            *self.base_args("CCO", "Ethanol"), "--formula", "100% pure"
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("sum formula", stderr)
+        self.assertIn("comment character", stderr)
+
+    def test_invalid_label_key_is_rejected(self) -> None:
+        code, _, stderr = self.run_cli(
+            *self.base_args("CCO", "Ethanol"), "--label", "bad label"
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("compound label", stderr)
 
     def test_duplicate_identifier_warns_but_appends(self) -> None:
         self.assertEqual(self.run_cli(*self.base_args("CCO", "Ethanol"))[0], 0)

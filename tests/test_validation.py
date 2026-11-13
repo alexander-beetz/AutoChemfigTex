@@ -5,8 +5,9 @@ import unittest
 from mol2chemfig_helper.validation import (
     ValidationError,
     normalize_name,
+    validate_annotation,
+    validate_cmpd_key,
     validate_identifier,
-    validate_label,
     validate_m2c_arg,
 )
 
@@ -30,29 +31,44 @@ class NameValidationTests(unittest.TestCase):
                     normalize_name(value)
 
 
-class LabelValidationTests(unittest.TestCase):
-    def test_accepts_plain_and_simple_tex_labels(self) -> None:
-        self.assertEqual(validate_label("Azid"), "Azid")
-        self.assertEqual(
-            validate_label(r"p-\textit{nitrophenyl} azide"),
-            r"p-\textit{nitrophenyl} azide",
-        )
-        self.assertEqual(validate_label(r"100\% pure"), r"100\% pure")
+class CmpdKeyValidationTests(unittest.TestCase):
+    def test_accepts_plain_keys(self) -> None:
+        for value in ("Azid", "azid", "compound-1", "cmpd.1:a", "1"):
+            with self.subTest(value=value):
+                self.assertEqual(validate_cmpd_key(value), value)
 
-    def test_rejects_unescaped_special_characters(self) -> None:
-        for value in ("100% pure", "C#N", "a\nb", "{unbalanced", "unbalanced}"):
+    def test_rejects_unsafe_or_empty_keys(self) -> None:
+        for value in ("", " ", "bad label", "bad{label}", "bad\\label", "bad%label"):
             with self.subTest(value=value):
                 with self.assertRaises(ValidationError):
-                    validate_label(value)
+                    validate_cmpd_key(value)
+
+
+class AnnotationValidationTests(unittest.TestCase):
+    def test_accepts_formula_and_weight_text(self) -> None:
+        self.assertEqual(validate_annotation("C6H6", "sum formula"), "C6H6")
+        self.assertEqual(
+            validate_annotation(r"\ce{C6H6}", "sum formula"), r"\ce{C6H6}"
+        )
+        self.assertEqual(validate_annotation("78.11", "molecular weight"), "78.11")
+        self.assertEqual(validate_annotation(r"100\% pure", "sum formula"), r"100\% pure")
+
+    def test_rejects_unsafe_or_empty_annotations(self) -> None:
+        for value in ("", " ", "a\nb", "100% pure", "C#N", "{unbalanced", "unbalanced}"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValidationError):
+                    validate_annotation(value, "sum formula")
 
     def test_rejects_control_characters(self) -> None:
         with self.assertRaises(ValidationError):
-            validate_label("bad\x00label")
+            validate_annotation("bad\x00label", "molecular weight")
 
     def test_rejects_trailing_unescaped_backslash(self) -> None:
         with self.assertRaises(ValidationError):
-            validate_label("bad\\")
-        self.assertEqual(validate_label("line break\\\\"), "line break\\\\")
+            validate_annotation("bad\\", "sum formula")
+        self.assertEqual(
+            validate_annotation("line break\\\\", "sum formula"), "line break\\\\"
+        )
 
 
 class IdentifierValidationTests(unittest.TestCase):
