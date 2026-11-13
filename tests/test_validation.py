@@ -49,6 +49,11 @@ class LabelValidationTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             validate_label("bad\x00label")
 
+    def test_rejects_trailing_unescaped_backslash(self) -> None:
+        with self.assertRaises(ValidationError):
+            validate_label("bad\\")
+        self.assertEqual(validate_label("line break\\\\"), "line break\\\\")
+
 
 class IdentifierValidationTests(unittest.TestCase):
     def test_accepts_normal_identifiers(self) -> None:

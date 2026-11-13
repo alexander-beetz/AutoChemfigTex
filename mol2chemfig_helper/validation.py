@@ -146,6 +146,13 @@ def validate_label(raw: str) -> str:
                 f"write '\\{character}' if you need the literal character"
             )
 
+    trailing_backslashes = len(label) - len(label.rstrip("\\"))
+    if trailing_backslashes % 2:
+        raise ValidationError(
+            "label must not end with an unescaped backslash because it would "
+            "escape the closing brace of the generated macro"
+        )
+
     depth = 0
     cursor = 0
     while cursor < len(label):
