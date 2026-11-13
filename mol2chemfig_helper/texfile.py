@@ -60,6 +60,7 @@ class Conflict:
     manual: tuple[DefinitionSpan, ...]
     aux_managed: ManagedBlock | None
     aux_manual: tuple[DefinitionSpan, ...]
+    blocked_by: tuple[str, ...] = ()
 
     @property
     def exists(self) -> bool:
@@ -68,11 +69,15 @@ class Conflict:
             or self.manual
             or self.aux_managed
             or self.aux_manual
+            or self.blocked_by
         )
 
     @property
     def can_overwrite(self) -> bool:
         """Whether overwrite_text() can produce a safe replacement."""
+
+        if self.blocked_by:
+            return False
 
         if self.aux_managed is not None or self.aux_manual:
             return False
@@ -212,6 +217,19 @@ def find_conflict(
         aux_managed = blocks.get(aux_name)
         aux_manual = find_definitions(text, aux_name, exclude=exclude)
 
+    # A generated block for another structure may already define this name as
+    # its auxiliary label macro (for example, a block for Ethanol defines
+    # \EthanolName).  That is still a LaTeX name clash.
+    blocked_by: list[str] = []
+    for block in blocks.values():
+        if block.name == entry.name:
+            continue
+        names = [entry.name]
+        if entry.generate_name_macro:
+            names.append(entry.label_macro_name)
+        if any(find_definitions(block.text, candidate) for candidate in names):
+            blocked_by.append(block.name)
+
     return Conflict(
         text=text,
         name=entry.name,
@@ -219,6 +237,7 @@ def find_conflict(
         manual=manual,
         aux_managed=aux_managed,
         aux_manual=aux_manual,
+        blocked_by=tuple(blocked_by),
     )
 
 
@@ -324,6 +343,8 @@ def overwrite_text(text: str, conflict: Conflict, entry: Entry) -> str | None:
 
     block = render_block(entry)
 
+    if conflict.blocked_by:
+        return None
     if conflict.aux_managed is not None or conflict.aux_manual:
         return None
 

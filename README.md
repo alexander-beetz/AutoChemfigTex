@@ -123,6 +123,8 @@ shows the existing definition and asks:
   instead.
 - If the same identifier is already stored under another name, a warning is
   printed but the new structure is still added.
+- A name that collides with another block's generated `\NameName` macro is
+  also treated as a conflict.
 - Non-interactive use requires `--overwrite` for an existing name; otherwise
   the command exits with an error.
 

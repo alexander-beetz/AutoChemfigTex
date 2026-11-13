@@ -335,6 +335,12 @@ def _describe_conflict(text: str, conflict: Conflict, path: Path) -> None:
             f"at line {line_number(text, definition.start)}.",
             file=sys.stderr,
         )
+    for block_name in conflict.blocked_by:
+        print(
+            f"the managed block for \\{block_name} already defines "
+            f"\\{conflict.name} or its label macro.",
+            file=sys.stderr,
+        )
 
 
 def _ask_conflict(*, can_overwrite: bool) -> str:

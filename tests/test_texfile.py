@@ -149,6 +149,15 @@ class ConflictTests(unittest.TestCase):
         conflict = find_conflict(text, entry(generate_name_macro=False), {})
         self.assertFalse(conflict.exists)
 
+    def test_new_name_cannot_collide_with_another_blocks_label_macro(self) -> None:
+        text = render_block(entry(name="Ethanol")) + "\n"
+        blocks = parse_managed_blocks(text)
+        conflict = find_conflict(text, entry(name="EthanolName"), blocks)
+        self.assertTrue(conflict.exists)
+        self.assertFalse(conflict.can_overwrite)
+        self.assertEqual(conflict.blocked_by, ("Ethanol",))
+        self.assertIsNone(overwrite_text(text, conflict, entry(name="EthanolName")))
+
     def test_two_manual_definitions_are_ambiguous(self) -> None:
         text = (
             "\\newcommand{\\Azid}{one}\n"
