@@ -52,13 +52,14 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0, stderr)
         text = self.structures.read_text(encoding="utf-8")
         self.assertIn("% === mol2chemfig-helper:Ethanol:BEGIN ===", text)
-        self.assertIn("% style: named", text)
         self.assertIn("\\newcommand{\\EthanolName}{%", text)
         self.assertIn("  \\textbf{\\cmpd{Ethanol}}%", text)
         self.assertIn("\\DeclareRobustCommand{\\EthanolStructure}{%", text)
         self.assertIn("  \\chemfig{CCO}%", text)
         self.assertIn("\\DeclareRobustCommand{\\Ethanol}{%", text)
         self.assertIn("  \\chemname{\\EthanolStructure}{\\EthanolName}%", text)
+        self.assertIn("\\DeclareRobustCommand{\\EthanolExtras}{%", text)
+        self.assertIn("  \\Ethanol%", text)
         self.assertIn("+\\DeclareRobustCommand", stdout)
         self.assertIn("added \\Ethanol", stdout)
 
@@ -203,19 +204,7 @@ class CliTests(unittest.TestCase):
         text = self.structures.read_text(encoding="utf-8")
         self.assertIn(r"\textbf{\cmpd{ethyl-alcohol}}", text)
 
-    def test_structure_only_output(self) -> None:
-        code, _, stderr = self.run_cli(
-            *self.base_args("CCN", "Ethylamine"), "--structure-only"
-        )
-        self.assertEqual(code, 0, stderr)
-        text = self.structures.read_text(encoding="utf-8")
-        self.assertIn("% style: structure-only", text)
-        self.assertIn("\\DeclareRobustCommand{\\Ethylamine}{%", text)
-        self.assertNotIn("EthylamineStructure", text)
-        self.assertIn("\\newcommand{\\EthylamineName}{%", text)
-        self.assertIn("\\textbf{\\cmpd{Ethylamine}}", text)
-
-    def test_formula_and_molecular_weight_are_in_name_macro(self) -> None:
+    def test_formula_and_molecular_weight_are_in_extras_macro(self) -> None:
         code, _, stderr = self.run_cli(
             *self.base_args("CCO", "Ethanol"),
             "--formula",
@@ -227,10 +216,36 @@ class CliTests(unittest.TestCase):
         text = self.structures.read_text(encoding="utf-8")
         self.assertIn("% sum formula: C6H6", text)
         self.assertIn("% molecular weight: 78.11", text)
-        self.assertIn("  \\shortstack[c]{%", text)
-        self.assertIn("    \\textbf{\\cmpd{Ethanol}}\\\\", text)
-        self.assertIn("    C6H6\\\\", text)
-        self.assertIn("    78.11%", text)
+        self.assertIn(
+            "\\newcommand{\\EthanolName}{%\n  \\textbf{\\cmpd{Ethanol}}%\n}",
+            text,
+        )
+        self.assertIn("\\DeclareRobustCommand{\\Ethanol}{%", text)
+        self.assertIn(
+            "  \\chemname{\\EthanolStructure}{\\EthanolName}%",
+            text,
+        )
+        self.assertIn(
+            "\\DeclareRobustCommand{\\EthanolExtras}{%\n"
+            "  \\chemname{\\EthanolStructure}{%\n"
+            "    \\shortstack[c]{%\n"
+            "      \\EthanolName\\\\\n"
+            "      C6H6\\\\\n"
+            "      78.11%\n"
+            "    }\n"
+            "  }%\n"
+            "}",
+            text,
+        )
+
+    def test_extras_macro_aliases_structure_and_number_without_annotations(self) -> None:
+        code, _, stderr = self.run_cli(*self.base_args("CCO", "Ethanol"))
+        self.assertEqual(code, 0, stderr)
+        text = self.structures.read_text(encoding="utf-8")
+        self.assertIn(
+            "\\DeclareRobustCommand{\\EthanolExtras}{%\n  \\Ethanol%\n}",
+            text,
+        )
 
     def test_invalid_formula_is_rejected(self) -> None:
         code, _, stderr = self.run_cli(

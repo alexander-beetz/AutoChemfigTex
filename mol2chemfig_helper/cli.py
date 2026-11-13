@@ -37,8 +37,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="m2c-structure",
         description=(
-            "Convert a chemical structure with mol2chemfig and add it to "
-            "structures.tex as a named structure macro with a compound label."
+            "Convert a chemical structure with mol2chemfig and add named "
+            "structure, structure+number and extras macros to structures.tex."
         ),
     )
     parser.add_argument(
@@ -79,23 +79,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--formula",
         "--sum-formula",
         dest="formula",
-        help="sum formula shown below the compound label (inserted as LaTeX)",
+        help=(
+            "sum formula added to \\NameExtras, below the compound number "
+            "(inserted as LaTeX)"
+        ),
     )
     parser.add_argument(
         "--mw",
         "--molecular-weight",
         dest="mw",
         help=(
-            "molecular weight shown below the sum formula or compound label "
-            "(inserted as LaTeX)"
-        ),
-    )
-    parser.add_argument(
-        "--structure-only",
-        action="store_true",
-        help=(
-            "generate \\Name as the bare structure; by default \\Name includes "
-            "the compound label"
+            "molecular weight added to \\NameExtras, below the sum formula or "
+            "compound number (inserted as LaTeX)"
         ),
     )
     parser.add_argument(
@@ -250,7 +245,6 @@ def _run(args: argparse.Namespace) -> int:
         label=label,
         chemfig=conversion.chemfig,
         m2c_args=("-f", "-w", *extra_args),
-        structure_only=args.structure_only,
         formula=formula,
         mw=mw,
     )

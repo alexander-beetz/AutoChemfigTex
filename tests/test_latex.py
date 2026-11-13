@@ -80,10 +80,12 @@ class LatexCompileTests(unittest.TestCase):
         self.compile_document(
             entry,
             "\\schemestart\n"
-            "\\Azid + \\Azid \\arrow{->} \\Azid\n"
+            "\\Azid + \\AzidExtras \\arrow{->} \\Azid\n"
             "\\schemestop\n"
             "\\par\n"
             "\\Azid\n"
+            "\\par\n"
+            "\\AzidExtras\n"
             "\\par\n"
             "\\AzidName\n"
             "\\par\n"
@@ -113,12 +115,12 @@ class LatexCompileTests(unittest.TestCase):
         self.compile_document(
             entry,
             "\\schemestart\n"
-            "\\Azid + \\Azid \\arrow{->} \\Azid\n"
+            "\\Azid + \\AzidExtras \\arrow{->} \\Azid\n"
             "\\schemestop\n",
             cmpd_preamble="\\usepackage{chemnum}\n",
         )
 
-    def test_structure_only_block_compiles(self) -> None:
+    def test_block_without_annotations_compiles(self) -> None:
         entry = Entry(
             name="Azid",
             identifier="N=N",
@@ -126,9 +128,15 @@ class LatexCompileTests(unittest.TestCase):
             label="Azid",
             chemfig=r"\chemfig{-N=N}",
             m2c_args=("-f", "-w"),
-            structure_only=True,
         )
-        self.compile_document(entry, "\\chemname{\\Azid}{\\AzidName}\n")
+        self.compile_document(
+            entry,
+            "\\schemestart\n"
+            "\\Azid + \\AzidExtras \\arrow{->} \\Azid\n"
+            "\\schemestop\n"
+            "\\par\n"
+            "\\AzidName\n",
+        )
 
 
 if __name__ == "__main__":
